@@ -1,6 +1,12 @@
 package com.example.bajnax.weatherapp.model
 
-import java.util.*
+import android.databinding.BaseObservable
 
-data class WeatherEntity(var apiResponse: ApiResponse, val date: Date,
-                         val dateString: String, val timeString: String, val fahrenheit: Int, val celsius: Int)
+
+data class WeatherEntity(var cityName: String,
+                         var celsius: String,
+                         var fahrenheit: String,
+                         var dateString: String = "",
+                         var timeString: String = "",
+                         var isFahrenheit: Boolean = false,
+                         var hasGraph: Boolean = false) : BaseObservable()

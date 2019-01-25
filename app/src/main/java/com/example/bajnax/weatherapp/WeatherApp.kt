@@ -1,8 +1,7 @@
 package com.example.bajnax.weatherapp
 
 import android.app.Application
-import com.example.bajnax.weatherapp.di.AppComponent
-import com.example.bajnax.weatherapp.di.DaggerAppComponent
+import com.example.bajnax.weatherapp.di.*
 
 class WeatherApp : Application() {
     companion object {
@@ -11,6 +10,6 @@ class WeatherApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        graph = DaggerAppComponent.create()
+        graph = DaggerAppComponent.builder().contextModule(ContextModule(this)).roomModule(RoomModule(this)).build()
     }
 }

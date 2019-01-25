@@ -8,12 +8,12 @@ import javax.inject.Singleton
 
 
 @Module
-object ContextModule {
+class ContextModule(private val application: Application) {
 
     @Provides
-    @JvmStatic
-    internal fun provideApplication(context: Context): Application {
-        return context.applicationContext as Application
+    @Singleton
+    fun provideApplication(): Context {
+        return application
     }
 
 }

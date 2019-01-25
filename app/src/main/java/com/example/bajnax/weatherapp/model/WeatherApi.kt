@@ -3,7 +3,6 @@ package com.example.bajnax.weatherapp.model
 import com.example.bajnax.weatherapp.utils.API_KEY
 import io.reactivex.Observable
 import retrofit2.http.GET
-import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface WeatherApi {

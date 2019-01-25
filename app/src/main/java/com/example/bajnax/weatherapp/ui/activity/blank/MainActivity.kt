@@ -9,6 +9,8 @@ import android.graphics.Color
 import android.location.Location
 import android.os.Bundle
 import android.support.v4.content.ContextCompat
+import android.support.v7.widget.DividerItemDecoration
+import android.support.v7.widget.DividerItemDecoration.HORIZONTAL
 import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.SearchView
 import android.util.Log
@@ -23,6 +25,7 @@ import com.example.bajnax.weatherapp.databinding.ActivityMainBinding
 import com.arellomobile.mvp.MvpAppCompatActivity
 import com.arellomobile.mvp.presenter.ProvidePresenter
 import com.example.bajnax.weatherapp.BR
+import com.example.bajnax.weatherapp.db.CityWithWeather
 import com.example.bajnax.weatherapp.model.ViewDetails
 import com.example.bajnax.weatherapp.model.WeatherEntity
 import com.example.bajnax.weatherapp.utils.WeatherAdapter
@@ -34,46 +37,78 @@ import com.tbruyelle.rxpermissions2.RxPermissions
 
 class MainActivity : MvpAppCompatActivity(), MainView {
 
+    @InjectPresenter
+    lateinit var mMainPresenter: MainPresenter
+
+    @ProvidePresenter
+    fun providePresenter(): MainPresenter = MainPresenter()
+
+    private lateinit var binding: ActivityMainBinding
+
     private val rxPermissions = RxPermissions(this)
     private var mFusedLocationClient: FusedLocationProviderClient? = null
     private var mLastLocation: Location? = null
-    private lateinit var weatherAdapter: WeatherAdapter
+    private var weatherAdapter: WeatherAdapter? = null
     private lateinit var viewDetails: ViewDetails
-    private lateinit var currentWeather: WeatherEntity
+    private lateinit var currentWeather: CityWithWeather
     private lateinit var currentWeatherList: MutableList<WeatherEntity>
-    private lateinit var binding: ActivityMainBinding
 
     // fills the recyclerView with the filtered list
-    override fun onWeatherLoaded(weatherList: MutableList<WeatherEntity>) {
-        currentWeather = weatherList[weatherList.lastIndex]
-        currentWeatherList = weatherList.sortedByDescending { it.date }
-            .distinctBy { it.apiResponse.name }.toMutableList()
-        weatherAdapter = WeatherAdapter(currentWeatherList)
-        weatherRecyclerView.adapter = weatherAdapter
+    override fun onWeatherLoaded(weatherList: List<CityWithWeather>, lastCityName: String) {
+        currentWeather = if(lastCityName.isEmpty())
+            weatherList.last()
+        else
+            weatherList.last { it.city.cityName == lastCityName }
+
         updateCurrentWeather()
+
+        currentWeatherList = weatherList.map { it ->
+            val hasGraph: Boolean = it.weatherList.size > 1
+            WeatherEntity(
+                it.city.cityName,
+                it.weatherList.last().celsius.toString(),
+                it.weatherList.last().fahrenheit.toString(),
+                it.weatherList.last().receivedDate,
+                it.weatherList.last().receivedTime,
+                viewDetails.isFahrenheit,
+                hasGraph
+            )
+        }.toMutableList()
+
+        if(weatherAdapter == null) {
+            weatherAdapter = WeatherAdapter(this, currentWeatherList)
+            weatherRecyclerView.adapter = weatherAdapter
+        } else {
+            updateAdapter()
+        }
     }
 
-    // TODO: should be replaced by the two-way data binding
+    private fun updateAdapter() {
+        for (item: WeatherEntity in currentWeatherList) {
+            item.isFahrenheit = viewDetails.isFahrenheit
+        }
+        // TODO: replace with observable DiffUtil
+        weatherAdapter = WeatherAdapter(this, currentWeatherList)
+        weatherRecyclerView.adapter = weatherAdapter
+    }
+
     // adjusts the appearance of the main view
     private fun updateCurrentWeather() {
         viewDetails.apply {
-            cityName = currentWeather.apiResponse.name
+            cityName = currentWeather.city.cityName
 
             color = when {
-                currentWeather.fahrenheit in 50..77 -> ContextCompat.getColor(this@MainActivity, R.color.lightYellow)
-                currentWeather.fahrenheit > 77 -> ContextCompat.getColor(this@MainActivity, R.color.lightOrange)
+                currentWeather.weatherList.last().fahrenheit in 50..77 -> ContextCompat.getColor(this@MainActivity, R.color.lightYellow)
+                currentWeather.weatherList.last().fahrenheit > 77 -> ContextCompat.getColor(this@MainActivity, R.color.lightOrange)
                 else -> ContextCompat.getColor(this@MainActivity, R.color.lightBlue)
             }
             show = true
             temp = if (viewDetails.isFahrenheit) {
-                currentWeather.fahrenheit
+                currentWeather.weatherList.last().fahrenheit
             } else {
-                currentWeather.celsius
+                currentWeather.weatherList.last().celsius
             }
         }
-
-        // TODO: update the degree type in the recyclerView items
-        // weatherAdapter.dispatch(changeDegreeType(viewDetails.isFahrenheit))
 
         binding.setVariable(BR.details, viewDetails)
         binding.notifyChange()
@@ -84,12 +119,6 @@ class MainActivity : MvpAppCompatActivity(), MainView {
         const val TAG = "MainActivity"
         fun getIntent(context: Context): Intent = Intent(context, MainActivity::class.java)
     }
-
-    @InjectPresenter
-    lateinit var mMainPresenter: MainPresenter
-
-    @ProvidePresenter
-    fun providePresenter(): MainPresenter = MainPresenter()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -104,6 +133,7 @@ class MainActivity : MvpAppCompatActivity(), MainView {
 
         tempTypeSwitch.setOnCheckedChangeListener { _, _ -> run {
                 viewDetails.isFahrenheit = !viewDetails.isFahrenheit
+                updateAdapter()
                 updateCurrentWeather()
             }
         }
